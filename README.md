@@ -4,7 +4,9 @@ layer.io test project based on fastapi
 ### Setup
 
 Setup an environemnt with Python 3.7 (for example with Anaconda ```conda create -n layeriov2 python=3.7 && conda activate layeriov2```) and install the dependecies with:
-```conda install sqlalchemy mysqlclient``` (or pip install)
+
+```conda install sqlalchemy mysqlclient``` (or pip install ...)
+
 ```pip install fastapi[all]``` (not yet available in conda)
 
 Or alternatively:
