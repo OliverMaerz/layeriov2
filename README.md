@@ -7,7 +7,9 @@ Setup an environemnt with Python 3.7 (for example with Anaconda ```conda create 
 
 ```conda install sqlalchemy mysqlclient``` (or pip install ...)
 
-```pip install fastapi[all]``` (not yet available in conda)
+```pip install fastapi[all]``` (not available in conda)
+
+```pip install python-pcre``` (not available in conda)
 
 Or alternatively:
 
