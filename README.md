@@ -93,7 +93,7 @@ curl -X PUT \
 }'
 ```
 
-To receive all sharings for the current user (with all data in the JSON response):
+To receive all sharings for the current user (so all selections, all recipients etc.):
 ```shell
 curl -X GET \
   http://127.0.0.1:8000/sharings/ \
@@ -108,7 +108,7 @@ curl -X GET \
   -H 'cache-control: no-cache'
 ```
 
-To receive a list of sharing_id's for the current user (so all selections, all recipients etc.):
+To receive just a list of sharing_id's for the current user:
 ```shell
 curl -X GET \
   http://127.0.0.1:8000/sharings/id \
@@ -122,6 +122,23 @@ curl -X GET \
   -H 'accept-encoding: gzip, deflate' \
   -H 'cache-control: no-cache'
 ```
+The result body of the response for a user with 10 sharings could look like this:
+```json
+{
+    "sharings": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        11,
+        13
+    ]
+}
+```
+
 
 To receive a list of selections for a particular share by share_id 
 (in the example below share_id=1):
