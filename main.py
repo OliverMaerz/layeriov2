@@ -1,206 +1,157 @@
-from fastapi import FastAPI, HTTPException
-from typing import List  # Set, Dict, Tuple, Optional
-from pydantic import BaseModel, EmailStr
-
-from sqlalchemy import Boolean, Column, Integer, String, create_engine, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base, declared_attr
-from sqlalchemy.orm import Session, sessionmaker
+from fastapi import Depends, FastAPI, HTTPException
 
 from starlette.requests import Request
 from starlette.responses import Response
 
-# import re
 import pcre
+import re
 
-import logging
-
-SQLALCHEMY_DATABASE_URI = "mysql://layeriou:tnQtS0jKmUpEp2tb9HSVX8gI9PgBwc@localhost/layerio"
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URI
-)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+from layerio.model import User, Share, User2Share, Selection, SharingRequest, DbUtil, Auth, DbSession
+from layerio.mastersheet import MasterSheet
 
 
-class CustomBase:
-    # Generate __tablename__ automatically
-    @declared_attr
-    def __tablename__(cls):
-        return cls.__name__.lower()
+# create object to get and destroy db session (and also create demo db)
+db_util = DbUtil()
 
+app = FastAPI()
 
-Base = declarative_base(cls=CustomBase)
+# Create the db for this little demo
+db_util.create_demo_db()
 
-
-class User(Base):
-    id = Column(Integer, primary_key=True, index=True)
-    email = Column(String(255), unique=True, index=True)
-
-
-class Sharing(Base):
-    id = Column(Integer, primary_key=True, index=True)
-    from_x = Column(Integer, unique=False, index=False)
-    from_y = Column(Integer, unique=False, index=False)
-    to_x = Column(Integer, unique=False, index=False)
-    to_y = Column(Integer, unique=False, index=False)
-
-
-class User2Sharing(Base):
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("user.id"), nullable=False, unique=False, index=True)
-    sharing_id = Column(Integer, ForeignKey("sharing.id"), nullable=False, unique=False, index=True)
-
-
-Base.metadata.create_all(bind=engine)
-
-
-# db_session = SessionLocal()
-
-# first_user = db_session.query(User).first()
-#  if not first_user:
-#    u = User(email="johndoe@example.com", hashed_password="notreallyhashed")
-#    db_session.add(u)
-#    db_session.commit()
-
-# db_session.close()
-
-class MasterSheet:
-    """Class to hold the sheet data and manage the shares."""
-
-    available_sheets = []
-
-    def __init__(self, available_sheets: List[str]):
-        self.available_sheets = available_sheets
-
-    @classmethod
-    def from_dummy_data(cls):
-        """Initialize MasterSheet with dummy data."""
-        available_sheets = ["HRReport", "Actuals", "Assumptions", "Dashboard"]
-        return cls(available_sheets)
-
-    @classmethod
-    def empty(cls):
-        """Initialize MasterSheet with empty sheet."""
-        available_sheets = []
-        return cls(available_sheets)
-
-    @classmethod
-    def from_excel(cls):
-        """Initialize MasterSheet with data from Excel file."""
-        pass
-
-    @classmethod
-    def from_csv(cls):
-        """Initialize MasterSheet with data from CSV file."""
-        pass
-
-    @classmethod
-    def from_google_sheet(cls):
-        """Initialize MasterSheet with data from Google Sheets."""
-        pass
-
-    def check_sheet(self, sheet_name: str):
-        """Returns True if sheet_name is valid, False otherwise.
-
-        Keyword arguments:
-        sheet_name -- str with name of sheet
-        """
-
-        if sheet_name in self.available_sheets:
-            return True
-        else:
-            return False
-
-
-#  class Sharings(BaseModel):
-#     sometext: EmailStr
-
-
-class Sharings(BaseModel):
-    emails: List[EmailStr]
-    sheet_selections: List[str]
-
-
-# class Sharings(BaseModel):
-#    sharing: Sharing()
-#    email: str
 
 # Dependency
 def get_db(request: Request):
     return request.state.db
 
-
-app = FastAPI()
-
-demo_ms = MasterSheet.from_dummy_data()
-empty_ms = MasterSheet.empty()
-
+# create master_sheet object from dummy data
+master_sheet = MasterSheet.from_dummy_data()
 
 @app.get("/")
 def read_root():
     return {"app": "Simple Sheet Manager", "version": "0.2"}
 
 
-@app.put("/sharing/")
-def add_sharing(sharings: Sharings):
-    # check if sharing is valid etc.
-    # raise HTTPException(status_code=404, detail="Item not found")
-    text = None
-    for sheet_selection in sharings.sheet_selections:
-        # white space needed to be removed for pattern matching string without single quotes
-        # regex = pcre.match("^((?>(>?'[\w\s]+')|(>?[\w]+))(?>![A-Z]{1}[0-9]{1})?(?>:[A-Z]{1}[0-9])?)",
-        #                    sheet_selection)
+@app.put("/sharings/")
+def add_sharing(sharing_request: SharingRequest, db: DbSession = Depends(get_db)):
+    # create new share in db
+    sh = Share(owner_id=Auth.get_current_user())
+    db.add(sh)
+    db.flush()
 
-        # Updated regular expression that allows A1:CCC1234567 and also lower case
+    # loop through emails and link them to share
+    for email in sharing_request.emails:
+        # check if user (email) already exists or create new one otherwise
+        u = db.query(User).filter_by(email=email).first()
+        if not u:
+            # user does not exist -> create
+            u = User(email=email)
+            db.add(u)
+            db.flush()
+
+        #  many to many
+        u2s = User2Share(user_id=u.user_id, share_id=sh.share_id)
+        db.add(u2s)
+        db.flush()
+
+    # Loop through sharings and check if they match the regex
+    for sharing in sharing_request.sharings:
+        # Updated regex that allows A1:CCC1234567 and also lower case letters
         regex = pcre.search(
             "^((?>(>?'[\w\s]+')|(>?[\w]+))(?>![a-z,A-Z]{1,3}[0-9]{1,7})?(?>:[a-z,A-Z]{1,3}[0-9]{1,7})?)",
-            sheet_selection)
-        if (regex is None) or (regex.group() != sheet_selection):
+            sharing)
+        if (regex is None) or (regex.group() != sharing):
+            # selection does not match the regex (no or just partial match) return 404 error
             raise HTTPException(status_code=404,
-                                detail="Sheet Selection string is not valid: "+sheet_selection)
+                                detail="Sheet Selection string is not valid: " + sharing)
 
-        logging.warning('regex results: %s', regex)
+        # sharing matches the required format store in db but first split the info into atomic properties
+        sheet_name, sheet_range = sharing.split("!", 1) if "!" in sharing else (sharing, None)
+        sheet_name = sheet_name.replace("'", "")
+        # check the sheet_name if valid
+        if not master_sheet.check_sheet(sheet_name):
+            # master_sheet object does not have a sheet with this name -> display error
+            raise HTTPException(status_code=404,
+                                detail="Sheet with name: '{}' does not exist.".format(sheet_name))
 
+        from_range, to_range = sheet_range.split(":", 1) if sheet_range and ":" in sheet_range else (sheet_range, None)
+        # logging.warning('debugging to_range: %s', to_range)
+        # Split the character part ("A" ...) from the number part ("1" ... )
+        from_column, from_row, _ = re.split("(\d+)", from_range) if from_range else (None, None, None)
+        to_column, to_row, _ = re.split("(\d+)", to_range) if to_range else (None, None, None)
+
+        sel = Selection(share_id=sh.share_id,
+                        sheet_name=sheet_name,
+                        from_column=from_column.upper() if from_column else None,
+                        from_row=from_row,
+                        to_column=to_column.upper() if to_column else None,
+                        to_row=to_row)
+        db.add(sel)
+        db.flush()
+
+    # all done commit transaction
+    db.commit()
     return {"success": True,
-            "emails": sharings.emails,
-            "sheet_selections": sharings.sheet_selections}
+            "emails": sharing_request.emails,
+            "sheet_selections": sharing_request.sharings}
 
 
 @app.get("/sharings/")
-def list_sharings():
-    return {"success": True, "sometext": sharings.sometext}
+def list_sharings(db: DbSession = Depends(get_db)):
+    """List all sharing ids for current user"""
+    # query to get all in one join ...
+    sh = db.query(Share, Selection, User2Share, User). \
+        join(Selection). \
+        join(User2Share). \
+        join(User). \
+        order_by(Share.share_id.desc()). \
+        all()
+    # logging.warning('debugging: %s', sh)
+    return {"sharings": sh}
 
 
-@app.get("/items/{item_id}")
-def read_item(item_id: int, q: str = None):
-    return {"item_id": item_id, "q": q, "mode": "synchronous"}
+@app.get("/sharings/id")
+def list_sharings(db: DbSession = Depends(get_db)):
+    """List all sharing ids for current user"""
+    sh = db.query(Share.share_id).filter_by(owner_id=Auth.get_current_user()).all()
+    return {"sharings": [r for r, in sh]}
 
 
-@app.get("/a/")
-async def read_root():
-    return {"Hello": "Asynchronous World"}
+@app.get("/sharings/{share_id}/selections/")
+def list_selections(share_id: int, db: DbSession = Depends(get_db)):
+    """List selections for given share_id"""
+    # join with Share object to check if current user is the really owner, but only return Selection object
+    sel = db.query(Selection, Share). \
+        with_entities(Selection). \
+        filter(Selection.share_id == share_id, Share.owner_id == Auth.get_current_user()). \
+        join(Share). \
+        all()
+    return {"selections": sel}
 
 
-@app.get("/a/items/{item_id}")
-async def read_item(item_id: int, q: str = None):
-    # y = await get_data(x)
-    return {"item_id": item_id, "q": q, "mode": "asynchronous"}
+@app.get("/sharings/{share_id}/users/")
+def list_selections(share_id: int, db: DbSession = Depends(get_db)):
+    """List users (emails) for given share_id"""
+    # join with Share object to check if current user is the really owner, but only return Selection object
+    us = db.query(User, User2Share, Share). \
+        with_entities(User.email). \
+        filter(Share.share_id == share_id, Share.owner_id == Auth.get_current_user()). \
+        join(User2Share). \
+        join(Share). \
+        all()
+    return {"users": [r for r, in us]}
 
 
 @app.middleware("http")
-async def db_session_middleware(request: Request, call_next):
+async def handle_db_session(request: Request, call_next):
+    """Create the db session and destroy it at the end"""
     response = Response("Internal server error", status_code=500)
     try:
-        request.state.db = SessionLocal()
+        request.state.db = db_util.get_session_local()
         response = await call_next(request)
     finally:
-        request.state.db.close()
+        db_util.close_session_local(request)
     return response
 
 
-# Sheetnames
-# from layer.io
-# regex = "^((?>(>?'[\w\s]+')|(>?'[\w\s]+'))(?>![A-Z]{1}[0-9]{1})?(?>:[A-Z]{1}[0-9])?)"
 
-# Files
-# regex filter invalid characters windows [\\/:"*?<>|]+
-# /^(?!.{256,})(?!(aux|clock\$|con|nul|prn|com[1-9]|lpt[1-9])(?:$|\.))[^ ][ \.\w-$()+=[\];#@~,&amp;']+[^\. ]$/i
+
