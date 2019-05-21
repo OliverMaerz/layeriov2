@@ -199,8 +199,8 @@ curl -X GET \
 }
 ```
 
-Finally to receive just the recipient email addresses/users as a list for a particular share a use the following request 
-(again share_id=1):
+Finally to receive just the recipient email addresses (users) as a list for a particular share, use the following request 
+(again in the example share_id=1):
 ```shell
 curl -X GET \
   http://127.0.0.1:8000/sharings/1/users \
@@ -213,7 +213,7 @@ curl -X GET \
   -H 'cache-control: no-cache' \
   -H 'referer: http://127.0.0.1:8000/sharings/11/users'
 ``` 
-... and this returns a response like the following:
+... and this returns a response body like the following:
 
 ```json
 {
