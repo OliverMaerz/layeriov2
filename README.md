@@ -16,14 +16,16 @@ Or alternatively:
 
 ```pip install -r requirements.txt```
 
-Start the server with 
-
-```uvicorn main:app --reload```
-
 The application requires mariadb (or mysql) as the rdms. 
 
 It is preconfigured for a database called "layerio" running on localhost with user "layeriou" and 
 password "tnQtS0jKmUpEp2tb9HSVX8gI9PgBwc". The setting is in the layerio/model.py around line 11
+
+Start the API server with 
+
+```uvicorn main:app --reload```
+
+
 
 ### Regex: 
 The regular expression (PCRE version) on the PDF allowed whitespace in the sheet names without quotes. 
