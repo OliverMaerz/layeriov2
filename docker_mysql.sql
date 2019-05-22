@@ -1,0 +1,6 @@
+CREATE DATABASE layerio;
+
+GRANT ALL PRIVILEGES ON layerio.* TO 'layeriou'@'localhost' IDENTIFIED BY 'tnQtS0jKmUpEp2tb9HSVX8gI9PgBwc';
+FLUSH PRIVILEGES;
+
+
