@@ -16,14 +16,16 @@ Or alternatively:
 
 ```pip install -r requirements.txt```
 
-Start the server with 
-
-```uvicorn main:app --reload```
-
 The application requires mariadb (or mysql) as the rdms. 
 
 It is preconfigured for a database called "layerio" running on localhost with user "layeriou" and 
 password "tnQtS0jKmUpEp2tb9HSVX8gI9PgBwc". The setting is in the layerio/model.py around line 11
+
+Start the API server with 
+
+```uvicorn main:app --reload```
+
+
 
 ### Regex: 
 The regular expression (PCRE version) on the PDF allowed whitespace in the sheet names without quotes. 
@@ -91,7 +93,7 @@ curl -X PUT \
 }'
 ```
 
-To receive all sharings for the current user (with all data in the JSON response):
+To receive all sharings for the current user (so all selections, all recipients etc.):
 ```shell
 curl -X GET \
   http://127.0.0.1:8000/sharings/ \
@@ -106,7 +108,7 @@ curl -X GET \
   -H 'cache-control: no-cache'
 ```
 
-To receive a list of sharing_id's for the current user (so all selections, all recipients etc.):
+To receive just a list of sharing_id's for the current user:
 ```shell
 curl -X GET \
   http://127.0.0.1:8000/sharings/id \
@@ -120,6 +122,23 @@ curl -X GET \
   -H 'accept-encoding: gzip, deflate' \
   -H 'cache-control: no-cache'
 ```
+The result body of the response for a user with 10 sharings could look like this:
+```json
+{
+    "sharings": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        11,
+        13
+    ]
+}
+```
+
 
 To receive a list of selections for a particular share by share_id 
 (in the example below share_id=1):
@@ -180,8 +199,8 @@ curl -X GET \
 }
 ```
 
-Finally to receive just the recipient email addresses/users as a list for a particular share a use the following request 
-(again share_id=1):
+Finally to receive just the recipient email addresses (users) as a list for a particular share, use the following request 
+(again in the example share_id=1):
 ```shell
 curl -X GET \
   http://127.0.0.1:8000/sharings/1/users \
@@ -194,7 +213,7 @@ curl -X GET \
   -H 'cache-control: no-cache' \
   -H 'referer: http://127.0.0.1:8000/sharings/11/users'
 ``` 
-... and this returns a response like the following:
+... and this returns a response body like the following:
 
 ```json
 {
