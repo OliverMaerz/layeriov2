@@ -25,6 +25,8 @@ Start the API server locally with
 
 ```uvicorn app.main:app --reload```
 
+### Docker
+
 To run the docker container run:
 ```shell
 docker build -t layeriodemo .
