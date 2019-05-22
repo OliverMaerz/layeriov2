@@ -21,10 +21,16 @@ The application requires mariadb (or mysql) as the rdms.
 It is preconfigured for a database called "layerio" running on localhost with user "layeriou" and 
 password "tnQtS0jKmUpEp2tb9HSVX8gI9PgBwc". The setting is in the layerio/model.py around line 11
 
-Start the API server with 
+Start the API server locally with 
 
-```uvicorn main:app --reload```
+```uvicorn app.main:app --reload```
 
+To run the docker container run:
+```shell
+docker build -t layeriodemo .
+docker run -d --name layeriocontainer -p 80:80 layeriodemo
+```
+(or alternatively run on other local port like 8080)
 
 
 ### Regex: 
